@@ -13,7 +13,7 @@ func SetupRoutes() chi.Router {
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	router.Get("/hello", controllers.HelloHandler)
+	router.Post("/identify-clothing", controllers.IdentifyClothingItemsHandler)
 
 	return router
 }

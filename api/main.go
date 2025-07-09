@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,18 +11,34 @@ import (
 	"time"
 
 	"diddo-api/routes"
+
+	"github.com/rs/cors"
 )
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	router := routes.SetupRoutes()
 
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowCredentials: true,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+	})
+
+	handler := c.Handler(router)
+
 	server := &http.Server{
-		Addr:    ":8080",
-		Handler: router,
+		Addr:    fmt.Sprintf(":%s", port),
+		Handler: handler,
 	}
 
 	go func() {
-		log.Println("Server starting on :8080")
+		log.Printf("Server starting on :%s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed to start: %v", err)
 		}

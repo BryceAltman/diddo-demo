@@ -5,9 +5,10 @@ import (
 )
 
 type Config struct {
-	Port        string
-	Environment string
-	OpenAIKey   string
+	Port                string
+	Environment         string
+	OpenAIKey           string
+	ProductSearchAPIKey string
 }
 
 func LoadConfig() *Config {
@@ -22,10 +23,12 @@ func LoadConfig() *Config {
 	}
 
 	openAIKey := os.Getenv("OPENAI_API_KEY")
+	productSearchAPIKey := os.Getenv("PRODUCT_SEARCH_API_KEY")
 
 	return &Config{
-		Port:        port,
-		Environment: environment,
-		OpenAIKey:   openAIKey,
+		Port:                port,
+		Environment:         environment,
+		OpenAIKey:           openAIKey,
+		ProductSearchAPIKey: productSearchAPIKey,
 	}
 }

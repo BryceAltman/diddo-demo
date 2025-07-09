@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"diddo-api/configs"
+	"diddo-api/models"
 	"diddo-api/services"
 	"diddo-api/utils"
 )
@@ -46,11 +47,36 @@ func IdentifyClothingItemsHandler(w http.ResponseWriter, r *http.Request) {
 
 	config := configs.LoadConfig()
 	openAIService := services.NewOpenAIService(config)
+	productSearchService := services.NewProductSearchService(config)
 
-	response, err := openAIService.IdentifyClothingItems(imageData)
+	clothingItems, err := openAIService.IdentifyClothingItems(imageData)
 	if err != nil {
 		utils.SendErrorResponse(w, http.StatusInternalServerError, "Failed to identify clothing items: "+err.Error())
 		return
+	}
+
+	for i, item := range clothingItems {
+		productSearchResponse, err := productSearchService.SearchProducts(item.SearchValue)
+		if err != nil {
+			utils.SendErrorResponse(w, http.StatusInternalServerError, "Failed to search for products: "+err.Error())
+			return
+		}
+
+		var shoppingResults []models.ShoppingResult
+		for _, product := range productSearchResponse.Data.Products {
+			shoppingResults = append(shoppingResults, models.ShoppingResult{
+				Title: product.Title,
+				URL:   product.URL,
+				Image: product.Image,
+				Price: product.Price,
+			})
+		}
+		clothingItems[i].ShoppingResults = shoppingResults
+	}
+
+	response := models.ClothingIdentificationResponse{
+		Items:  clothingItems,
+		Status: "success",
 	}
 
 	utils.SendJSONResponse(w, http.StatusOK, response)

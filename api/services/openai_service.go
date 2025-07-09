@@ -26,14 +26,14 @@ func NewOpenAIService(config *configs.Config) *OpenAIService {
 	}
 }
 
-func (s *OpenAIService) IdentifyClothingItems(imageData []byte) (models.ClothingIdentificationResponse, error) {
+func (s *OpenAIService) IdentifyClothingItems(imageData []byte) ([]models.ClothingItem, error) {
 	if s.config.OpenAIKey == "" {
-		return models.ClothingIdentificationResponse{}, fmt.Errorf("OpenAI API key not configured")
+		return nil, fmt.Errorf("OpenAI API key not configured")
 	}
 
 	base64Image := base64.StdEncoding.EncodeToString(imageData)
 
-	prompt := `Identify and analyze all clothing items in this image. For each of them return a string to be used to find them item with a google shopping search, be extremely descriptive so that an exact match can be found. Analyze the image carefully and identify all visible clothing items. Return only valid JSON.`
+	prompt := `Identify and analyze all clothing items in this image. For each of them return a short title string and also a longer more descriptive string to be used to find them item with a google shopping search, be extremely descriptive so that an exact match can be found. Analyze the image carefully and identify all visible clothing items. Return only valid JSON.`
 
 	resp, err := s.client.CreateChatCompletion(
 		context.Background(),
@@ -68,11 +68,14 @@ func (s *OpenAIService) IdentifyClothingItems(imageData []byte) (models.Clothing
 								Items: &jsonschema.Definition{
 									Type: jsonschema.Object,
 									Properties: map[string]jsonschema.Definition{
-										"description": {
+										"search_value": {
+											Type: jsonschema.String,
+										},
+										"title": {
 											Type: jsonschema.String,
 										},
 									},
-									Required: []string{"description"},
+									Required: []string{"search_value", "title"},
 								},
 							},
 						},
@@ -84,23 +87,31 @@ func (s *OpenAIService) IdentifyClothingItems(imageData []byte) (models.Clothing
 	)
 
 	if err != nil {
-		return models.ClothingIdentificationResponse{}, fmt.Errorf("failed to identify clothing items: %w", err)
+		return nil, fmt.Errorf("failed to identify clothing items: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		return models.ClothingIdentificationResponse{}, fmt.Errorf("no response from OpenAI")
+		return nil, fmt.Errorf("no response from OpenAI")
 	}
 
 	var openAIResponse struct {
-		Items []models.ClothingItemDescription `json:"items"`
+		Items []struct {
+			SearchValue string `json:"search_value"`
+			Title       string `json:"title"`
+		} `json:"items"`
 	}
 
 	if err := json.Unmarshal([]byte(resp.Choices[0].Message.Content), &openAIResponse); err != nil {
-		return models.ClothingIdentificationResponse{}, fmt.Errorf("failed to parse OpenAI response: %w. Response: %s", err, resp.Choices[0].Message.Content)
+		return nil, fmt.Errorf("failed to parse OpenAI response: %w. Response: %s", err, resp.Choices[0].Message.Content)
 	}
 
-	return models.ClothingIdentificationResponse{
-		Items:  openAIResponse.Items,
-		Status: "success",
-	}, nil
+	var clothingItems []models.ClothingItem
+	for _, item := range openAIResponse.Items {
+		clothingItems = append(clothingItems, models.ClothingItem{
+			Title:       item.Title,
+			SearchValue: item.SearchValue,
+		})
+	}
+
+	return clothingItems, nil
 }
